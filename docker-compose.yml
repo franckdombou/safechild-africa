@@ -1,0 +1,91 @@
+version: '3.9'
+
+services:
+  # ─── PostgreSQL ───────────────────────────────────────
+  postgres:
+    image: postgis/postgis:16-3.4
+    container_name: safechild_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: safechild
+      POSTGRES_PASSWORD: safechild_secret
+      POSTGRES_DB: safechild_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U safechild"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── Redis ────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: safechild_redis
+    restart: unless-stopped
+    command: redis-server --requirepass redis_secret
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── MQTT Broker (EMQX) ───────────────────────────────
+  emqx:
+    image: emqx:5
+    container_name: safechild_mqtt
+    restart: unless-stopped
+    ports:
+      - "1883:1883"    # MQTT
+      - "8083:8083"    # MQTT over WebSocket
+      - "18083:18083"  # Dashboard EMQX
+    environment:
+      EMQX_NODE_NAME: emqx@localhost
+    volumes:
+      - emqx_data:/opt/emqx/data
+    healthcheck:
+      test: ["CMD", "/opt/emqx/bin/emqx", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── InfluxDB (GPS Time Series) ───────────────────────
+  influxdb:
+    image: influxdb:2.7
+    container_name: safechild_influx
+    restart: unless-stopped
+    ports:
+      - "8086:8086"
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: safechild
+      DOCKER_INFLUXDB_INIT_PASSWORD: safechild_secret
+      DOCKER_INFLUXDB_INIT_ORG: safechild
+      DOCKER_INFLUXDB_INIT_BUCKET: gps_positions
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: safechild_influx_token
+    volumes:
+      - influxdb_data:/var/lib/influxdb2
+
+  # ─── Redis Commander (UI Redis) ───────────────────────
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: safechild_redis_ui
+    restart: unless-stopped
+    environment:
+      REDIS_HOSTS: "local:redis:6379:0:redis_secret"
+    ports:
+      - "8081:8081"
+    depends_on:
+      - redis
+
+volumes:
+  postgres_data:
+  redis_data:
+  emqx_data:
+  influxdb_data:
