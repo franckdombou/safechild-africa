@@ -1,0 +1,541 @@
+// ─────────────────────────────────────────────────────────────
+// SafeChild Africa — Schéma Base de Données Complet
+// ─────────────────────────────────────────────────────────────
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+
+
+// ─── ENUMS ───────────────────────────────────────────────────
+
+enum UserRole {
+  SUPER_ADMIN
+  SCHOOL_ADMIN
+  PARENT
+}
+
+enum Gender {
+  MALE
+  FEMALE
+}
+
+enum SubscriptionPlan {
+  BASIC
+  STANDARD
+  PREMIUM
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  EXPIRED
+  CANCELLED
+  TRIAL
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  REFUNDED
+}
+
+enum PaymentMethod {
+  ORANGE_MONEY
+  MTN_MOMO
+  WAVE
+  CARD
+  CASH
+}
+
+enum BraceletStatus {
+  ACTIVE
+  INACTIVE
+  LOST
+  DEFECTIVE
+  IN_STOCK
+}
+
+enum SchoolType {
+  MATERNELLE
+  PRIMAIRE
+  SECONDAIRE
+  UNIVERSITE
+  AUTRE
+}
+
+enum SchoolStatus {
+  PENDING      // En attente de validation par SuperAdmin
+  APPROVED     // Validée et visible
+  SUSPENDED    // Suspendue temporairement
+  REJECTED     // Rejetée
+}
+
+enum SchoolAccessStatus {
+  PENDING      // Parent a demandé, école n'a pas encore validé
+  APPROVED     // École a validé
+  REJECTED     // École a refusé
+  REVOKED      // Parent a retiré l'accès
+}
+
+enum AlertType {
+  ARRIVED_SCHOOL
+  LEFT_SCHOOL
+  ARRIVED_HOME
+  LEFT_HOME
+  ROUTE_DEVIATION
+  BRACELET_REMOVED
+  BRACELET_OFFLINE
+  SOS_TRIGGERED
+  CHILD_MISSING
+  CHILD_FOUND
+  LOW_BATTERY
+  ENTERED_SAFE_ZONE
+  LEFT_SAFE_ZONE
+  ENTERED_DANGER_ZONE
+}
+
+enum AlertSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+enum AlertStatus {
+  ACTIVE
+  ACKNOWLEDGED  // Parent a vu l'alerte
+  RESOLVED
+}
+
+enum MissingStatus {
+  ACTIVE
+  FOUND
+  CLOSED
+}
+
+enum NotificationChannel {
+  PUSH
+  SMS
+  EMAIL
+  WHATSAPP
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  DELIVERED
+  READ
+  FAILED
+}
+
+enum MessageStatus {
+  SENT
+  READ
+}
+
+enum ZoneType {
+  HOME
+  SCHOOL
+  CUSTOM         // Chez grands-parents, sport...
+}
+
+enum DangerLevel {
+  ORANGE
+  RED
+}
+
+// ─── MODELS ──────────────────────────────────────────────────
+
+// Table centrale des utilisateurs
+model User {
+  id            String    @id @default(uuid())
+  phone         String    @unique
+  email         String?   @unique
+  passwordHash  String
+  firstName     String
+  lastName      String
+  avatarUrl     String?
+  role          UserRole
+  isActive      Boolean   @default(true)
+  isVerified    Boolean   @default(false)
+  lastLoginAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  parent        Parent?
+  schoolAdmin   SchoolAdmin?
+  sentMessages      Message[]     @relation("SentMessages")
+  receivedMessages  Message[]     @relation("ReceivedMessages")
+  auditLogs     AuditLog[]
+
+  @@map("users")
+}
+
+// Informations spécifiques aux parents
+model Parent {
+  id              String    @id @default(uuid())
+  userId          String    @unique
+  city            String?
+  country         String    @default("CM")
+  fcmToken        String?   // Token Firebase pour push notifications
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  children        Child[]
+  subscription    Subscription?
+  payments        Payment[]
+
+  @@map("parents")
+}
+
+// Les enfants à protéger
+model Child {
+  id                String    @id @default(uuid())
+  parentId          String
+  firstName         String
+  lastName          String
+  dateOfBirth       DateTime
+  gender            Gender
+  photoUrl          String?
+  // Description physique pour alerte disparition
+  height            Float?    // en cm
+  weight            Float?    // en kg
+  skinTone          String?
+  distinctiveSigns  String?   // cicatrices, tatouages...
+  bloodType         String?
+  isActive          Boolean   @default(true)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  parent            Parent          @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  bracelet          Bracelet?
+  schoolAccesses    SchoolAccess[]
+  safeZones         SafeZone[]
+  routes            Route[]
+  alerts            Alert[]
+  missingReports    MissingReport[]
+  notifications     Notification[]
+
+  @@map("children")
+}
+
+// Les bracelets connectés
+model Bracelet {
+  id              String          @id @default(uuid())
+  serialNumber    String          @unique  // Gravé sur le bracelet
+  deviceId        String          @unique  // ID technique MQTT
+  childId         String?         @unique
+  firmwareVersion String          @default("1.0.0")
+  status          BraceletStatus  @default(IN_STOCK)
+  batteryLevel    Int?            // 0-100
+  lastSeenAt      DateTime?
+  lastLatitude    Float?
+  lastLongitude   Float?
+  activatedAt     DateTime?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  // Relations
+  child           Child?          @relation(fields: [childId], references: [id])
+
+  @@map("bracelets")
+}
+
+// Les établissements scolaires
+model School {
+  id              String        @id @default(uuid())
+  name            String
+  type            SchoolType
+  status          SchoolStatus  @default(PENDING)
+  registrationNum String?       // Numéro agrément ministère
+  phone           String?
+  email           String?
+  website         String?
+  photoUrl        String?
+  logoUrl         String?
+  address         String
+  city            String
+  region          String
+  country         String        @default("CM")
+  // Géolocalisation
+  latitude        Float
+  longitude       Float
+  // Geofence stocké en JSON (polygone ou cercle)
+  geofence        Json
+  // Horaires
+  openTime        String        @default("07:30")
+  closeTime       String        @default("15:30")
+  workDays        String[]      @default(["MON","TUE","WED","THU","FRI"])
+  // Stats
+  totalStudents   Int           @default(0)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  // Relations
+  admins          SchoolAdmin[]
+  schoolAccesses  SchoolAccess[]
+  safeZones       SafeZone[]
+
+  @@map("schools")
+}
+
+// Administrateurs des écoles
+model SchoolAdmin {
+  id          String    @id @default(uuid())
+  userId      String    @unique
+  schoolId    String
+  canNotify   Boolean   @default(true)   // Peut envoyer notifs aux parents
+  canValidate Boolean   @default(true)   // Peut valider les élèves
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  school      School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@map("school_admins")
+}
+
+// Liaison enfant ↔ école (avec validation)
+model SchoolAccess {
+  id          String              @id @default(uuid())
+  childId     String
+  schoolId    String
+  status      SchoolAccessStatus  @default(PENDING)
+  className   String?             // Classe de l'enfant
+  requestedAt DateTime            @default(now())
+  validatedAt DateTime?
+  revokedAt   DateTime?
+  revokedBy   String?             // "PARENT" ou "SCHOOL"
+  note        String?             // Motif refus ou révocation
+
+  // Relations
+  child       Child               @relation(fields: [childId], references: [id], onDelete: Cascade)
+  school      School              @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@unique([childId, schoolId])
+  @@map("school_accesses")
+}
+
+// Zones sûres (maison, école, chez grand-parents...)
+model SafeZone {
+  id          String    @id @default(uuid())
+  childId     String?
+  schoolId    String?
+  name        String    // "Maison", "École", "Chez mamie"
+  type        ZoneType
+  latitude    Float
+  longitude   Float
+  radius      Float     @default(100)  // mètres
+  geofence    Json?     // Polygone si forme complexe
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  child       Child?    @relation(fields: [childId], references: [id], onDelete: Cascade)
+  school      School?   @relation(fields: [schoolId], references: [id])
+
+  @@map("safe_zones")
+}
+
+// Trajets habituels des enfants
+model Route {
+  id          String    @id @default(uuid())
+  childId     String
+  name        String    @default("Trajet école")
+  // Points GPS du trajet stockés en JSON
+  waypoints   Json      // [{ lat, lng, order }]
+  // Tolérance de déviation en mètres
+  tolerance   Float     @default(200)
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  child       Child     @relation(fields: [childId], references: [id], onDelete: Cascade)
+
+  @@map("routes")
+}
+
+// Toutes les alertes du système
+model Alert {
+  id          String          @id @default(uuid())
+  childId     String
+  type        AlertType
+  severity    AlertSeverity
+  status      AlertStatus     @default(ACTIVE)
+  title       String
+  message     String
+  latitude    Float?          // Position au moment de l'alerte
+  longitude   Float?
+  metadata    Json?           // Données supplémentaires selon le type
+  readAt      DateTime?
+  resolvedAt  DateTime?
+  createdAt   DateTime        @default(now())
+
+  // Relations
+  child       Child           @relation(fields: [childId], references: [id], onDelete: Cascade)
+  notifications Notification[]
+
+  @@map("alerts")
+}
+
+// Déclarations de disparition
+model MissingReport {
+  id                String        @id @default(uuid())
+  childId           String
+  status            MissingStatus @default(ACTIVE)
+  lastSeenAt        DateTime?
+  lastSeenLocation  String?
+  lastLatitude      Float?
+  lastLongitude     Float?
+  description       String?       // Vêtements portés, contexte...
+  amberRadius       Float         @default(50)  // km
+  // Coordinations
+  policeNotified    Boolean       @default(false)
+  policeReportNum   String?
+  foundAt           DateTime?
+  foundLatitude     Float?
+  foundLongitude    Float?
+  closedAt          DateTime?
+  closingNote       String?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  // Relations
+  child             Child         @relation(fields: [childId], references: [id], onDelete: Cascade)
+
+  @@map("missing_reports")
+}
+
+// Toutes les notifications envoyées
+model Notification {
+  id          String                @id @default(uuid())
+  childId     String?
+  alertId     String?
+  userId      String                // Destinataire
+  channel     NotificationChannel
+  status      NotificationStatus    @default(PENDING)
+  title       String
+  body        String
+  data        Json?                 // Données pour l'app (deep link...)
+  sentAt      DateTime?
+  deliveredAt DateTime?
+  readAt      DateTime?
+  failReason  String?
+  createdAt   DateTime              @default(now())
+
+  // Relations
+  child       Child?                @relation(fields: [childId], references: [id])
+  alert       Alert?                @relation(fields: [alertId], references: [id])
+
+  @@map("notifications")
+}
+
+// Abonnements des parents
+model Subscription {
+  id          String              @id @default(uuid())
+  parentId    String              @unique
+  plan        SubscriptionPlan    @default(BASIC)
+  status      SubscriptionStatus  @default(TRIAL)
+  startDate   DateTime            @default(now())
+  endDate     DateTime
+  autoRenew   Boolean             @default(true)
+  trialEndsAt DateTime?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  // Relations
+  parent      Parent              @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  payments    Payment[]
+
+  @@map("subscriptions")
+}
+
+// Historique des paiements
+model Payment {
+  id              String          @id @default(uuid())
+  parentId        String
+  subscriptionId  String?
+  amount          Float           // en FCFA
+  currency        String          @default("XAF")
+  method          PaymentMethod
+  status          PaymentStatus   @default(PENDING)
+  transactionId   String?         // ID retourné par Orange Money etc.
+  phoneNumber     String?         // Numéro Mobile Money utilisé
+  failReason      String?
+  paidAt          DateTime?
+  createdAt       DateTime        @default(now())
+
+  // Relations
+  parent          Parent          @relation(fields: [parentId], references: [id])
+  subscription    Subscription?   @relation(fields: [subscriptionId], references: [id])
+
+  @@map("payments")
+}
+
+// Messagerie interne (Parent ↔ École ↔ Admin)
+model Message {
+  id          String        @id @default(uuid())
+  senderId    String
+  receiverId  String
+  subject     String?
+  body        String
+  status      MessageStatus @default(SENT)
+  readAt      DateTime?
+  createdAt   DateTime      @default(now())
+
+  // Relations
+  sender      User          @relation("SentMessages", fields: [senderId], references: [id])
+  receiver    User          @relation("ReceivedMessages", fields: [receiverId], references: [id])
+
+  @@map("messages")
+}
+
+// Zones dangereuses définies par le Super Admin
+model DangerZone {
+  id          String      @id @default(uuid())
+  name        String
+  description String?
+  level       DangerLevel
+  latitude    Float
+  longitude   Float
+  radius      Float       // mètres
+  geofence    Json?       // Polygone
+  city        String?
+  isActive    Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@map("danger_zones")
+}
+
+// Journal d'audit (qui a fait quoi)
+model AuditLog {
+  id          String    @id @default(uuid())
+  userId      String
+  action      String    // ex: "SCHOOL_CREATED", "CHILD_DELETED"
+  entity      String    // ex: "School", "Child"
+  entityId    String?
+  oldValues   Json?     // Avant modification
+  newValues   Json?     // Après modification
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime  @default(now())
+
+  // Relations
+  user        User      @relation(fields: [userId], references: [id])
+
+  @@map("audit_logs")
+}
