@@ -1,0 +1,68 @@
+samedi 27/06/2026
+C:\Users\s.developpeur2\Desktop\safechild-africa\
+└── safechild-africa/
+    ├── apps/
+    │   ├── api/              ← Backend NestJS (pas encore codé)
+    │   ├── web-admin/        ← À créer
+    │   ├── web-school/       ← À créer
+    │   └── mobile/           ← À créer
+    ├── packages/
+    │   ├── shared-types/     ← ✅ Types créés
+    │   ├── database/         ← À créer (Prisma)
+    │   └── ui/               ← À créer
+    ├── docker-compose.yml    ← ✅ Configuré
+    ├── turbo.json            ← ✅ Configuré
+    ├── pnpm-workspace.yaml   ← ✅ Configuré
+    ├── package.json          ← ✅ Configuré
+    └── .env                  ← ✅ Configuré (ne jamais pusher sur Git)
+	
+	⏳ En cours   → Docker télécharge les images (vous attendez)
+⬜ Suivant    → Schéma Prisma (base de données complète)
+⬜ Suivant    → Module Auth (login, JWT, OTP)
+⬜ Suivant    → Module Enfants + Bracelets
+⬜ Suivant    → Module Alertes temps réel
+⬜ Suivant    → Module École
+⬜ Suivant    → Frontend React (Admin + École)
+⬜ Suivant    → App Mobile React Native
+⬜ Suivant    → Intégration bracelet physique
+
+💻 CHANGER DE PC — Comment continuer à travailler
+Tout votre code est sur GitHub . Changer de PC est donc très simple.
+
+Sur le nouveau PC, installez ces outils :
+1. Git
+https://git-scm.com/download/win
+→ Télécharger et installer avec les options par défaut
+2. Node.js 20 LTS
+https://nodejs.org
+→ Télécharger la version LTS (20.x)
+→ Installer avec les options par défaut
+3. pnpm
+PowerShellnpm install -g pnpm
+4. Docker Desktop
+https://www.docker.com/products/docker-desktop/
+→ Même installation que ce qu'on a fait aujourd'hui
+
+Récupérer le projet depuis GitHub
+PowerShell# 1. Cloner le dépôt
+git clone https://github.com/VOTRE_USERNAME/safechild-africa.git
+cd safechild-africa
+
+# 2. Installer toutes les dépendances
+#    (pnpm lit le pnpm-workspace.yaml et installe tout)
+pnpm install
+
+# 3. Recréer le fichier .env
+#    (il n'est PAS sur GitHub car dans .gitignore)
+#    → Copiez votre .env depuis l'ancien PC
+#    OU recréez-le manuellement
+copy .env.example .env
+#    Puis remplissez les valeurs
+
+# 4. Démarrer Docker
+pnpm docker:up
+
+# 5. Démarrer le projet
+pnpm dev
+
+dimanche 28/06/2026
