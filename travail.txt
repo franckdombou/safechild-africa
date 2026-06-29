@@ -1,4 +1,4 @@
-samedi 27/06/2026
+																						samedi 27/06/2026
 C:\Users\s.developpeur2\Desktop\safechild-africa\
 └── safechild-africa/
     ├── apps/
@@ -65,4 +65,85 @@ pnpm docker:up
 # 5. Démarrer le projet
 pnpm dev
 
-dimanche 28/06/2026
+❌ NE JAMAIS pusher le fichier .env sur GitHub
+   → Il contient vos mots de passe et clés secrètes
+   → Il est dans .gitignore donc protégé automatiquement
+   → Gardez-en une copie sécurisée (ex: gestionnaire de mots de passe)
+
+✅ Toujours faire git pull avant de commencer à travailler
+   → Récupère les dernières modifications
+
+✅ Toujours faire git push après avoir travaillé
+   → Sauvegarde votre travail sur GitHub
+
+✅ Docker doit être démarré avant pnpm dev
+   → PostgreSQL, Redis, MQTT doivent tourner
+   
+   
+   # Récupérer les dernières modifications (début de journée)
+git pull origin main
+
+# Voir ce qui a changé
+git status
+
+# Sauvegarder votre travail
+git add .
+git commit -m "feat: description de ce que vous avez fait"
+git push origin main
+
+# Créer une branche pour une nouvelle fonctionnalité
+git checkout -b feature/module-auth
+# ... travailler ...
+git push origin feature/module-auth
+
+																				dimanche 28/06/2026
+
+✅ Infrastructure     → Docker, PostgreSQL, Redis, MQTT
+✅ Base de données    → 17 tables Prisma migrées
+✅ Backend NestJS     → Serveur démarré
+✅ Module Auth        → Register, Login, JWT, Guards
+⬜ Module Children    → Gestion des enfants
+⬜ Module Bracelets   → IoT + MQTT
+⬜ Module Schools     → Établissements
+⬜ Module Alerts      → Temps réel WebSocket
+⬜ Module Payments    → Mobile Money
+⬜ Frontend React     → Dashboard Admin + École
+⬜ App Mobile         → React Native Parent
+
+✅ POST /auth/register  → Inscription + création parent + trial
+✅ POST /auth/login     → Connexion + JWT tokens
+✅ GET  /auth/me        → Profil complet avec relations
+✅ JWT Guard            → Protection des routes
+✅ Roles Guard          → Contrôle par rôle
+✅ Decorators           → @Public, @Roles, @CurrentUser
+
+Ce qu'on a créé comme fichiers
+src/
+├── prisma/
+│   ├── prisma.service.ts    → Connexion à la base de données
+│   └── prisma.module.ts     → Rend Prisma disponible partout
+│
+└── modules/auth/
+    ├── auth.module.ts       → Déclare tout le module
+    ├── auth.service.ts      → Logique métier (inscription, login...)
+    ├── auth.controller.ts   → Routes HTTP (register, login, me...)
+    ├── dto/
+    │   └── auth.dto.ts      → Validation des données entrantes
+    ├── guards/
+    │   ├── jwt-auth.guard.ts  → Vérifie le token JWT
+    │   └── roles.guard.ts     → Vérifie le rôle de l'utilisateur
+    ├── strategies/
+    │   └── jwt.strategy.ts    → Comment lire/valider un JWT
+    └── decorators/
+        ├── public.decorator.ts       → @Public()
+        ├── roles.decorator.ts        → @Roles()
+        └── current-user.decorator.ts → @CurrentUser()
+		
+
+POST /auth/login
+{
+  "phone": "+237699000000",
+  "password": "motdepasse123"
+}
+ pnpm run start:dev
+
